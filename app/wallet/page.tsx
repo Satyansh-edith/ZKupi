@@ -287,7 +287,7 @@ export default function WalletPage() {
                   {/* Action Buttons */}
                   <div className="grid grid-cols-2 gap-4">
                     <Link
-                      href="/merchant"
+                      href="/pay/merchant"
                       className="group p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl text-center hover:shadow-lg transition-all"
                     >
                       <span className="block text-purple-600 font-medium mb-1">Pay Merchant</span>
