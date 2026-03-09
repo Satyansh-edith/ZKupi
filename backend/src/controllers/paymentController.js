@@ -1,224 +1,129 @@
 /**
  * Payment Controller
- * ==================
- * The core ZK-UPI payment execution flow.
- * Verifies proofs, prevents double-spends via nullifiers, and
- * delegates actual fund movement to the external Payment Engine.
+ * ------------------
+ * Core ZK-UPI payment execution flow.
+ *
+ * Flow:
+ *   1. Validate request inputs
+ *   2. Look up the sender user in the database
+ *   3. Cross-check the ZK commitment against the registered identity hash
+ *   4. Check the nullifier to prevent double-spend
+ *   5. Verify the ZK proof (mock in hackathon mode)
+ *   6. Record nullifier + transaction atomically in a DB transaction
+ *   7. Return the transaction ID
  */
 
-const axios = require('axios');
+const axios  = require('axios');
 const prisma = require('../lib/prisma');
 const { config } = require('../utils/envValidator');
 const { verifyZKProof } = require('../utils/proofVerifier');
 const { ValidationError, ProofError, NotFoundError } = require('../utils/errorHandler');
 
-/**
- * 1. Submit Payment
- * POST /api/payment/submit
- *
- * Flow:
- * 1. Extract inputs
- * 2. Validate inputs
- * 3. Check nullifier to prevent double-spend
- * 4. Verify ZK Proof
- * 5. Call external payment engine
- * 6. Store nullifier & Transaction record
- */
+// ── submitPayment ─────────────────────────────────────────────────────────────
+// POST /api/payment/submit
 const submitPayment = async (req, res) => {
-  // ── 1. Extract from request body ───────────────────────────────────────────
-  const {
-    proof,
-    publicSignals,
-    fromUserId, // UUID of the sender in the User table
-    toAddress,  // Merchant/Receiver ID
-    amount      // Amount to transfer
-  } = req.body;
+  const { proof, publicSignals, fromUserId, toAddress, amount } = req.body;
 
-  console.log(`[Payment] Processing transfer of ₹${amount} to ${toAddress}`);
-
-  // ── 2. Validate all inputs are present ──────────────────────────────────────
+  // Step 1 — Validate inputs
   if (!proof || !publicSignals || !fromUserId || !toAddress || amount === undefined) {
-    throw new ValidationError(
-      'Missing required fields. Expected: proof, publicSignals, fromUserId, toAddress, amount.'
-    );
+    throw new ValidationError('Missing fields: proof, publicSignals, fromUserId, toAddress, amount');
   }
-
   if (typeof amount !== 'number' || amount <= 0) {
-    throw new ValidationError('Amount must be a positive number.');
+    throw new ValidationError('amount must be a positive number.');
   }
 
-  // Ensure publicSignals is an array and extract the nullifier and commitment
-  const signalsArray = Array.isArray(publicSignals)
+  // Step 2 — Normalise publicSignals
+  const signals = Array.isArray(publicSignals)
     ? publicSignals
     : [String(amount), publicSignals.nullifier, publicSignals.commitment];
 
-  if (signalsArray.length < 3) {
-    throw new ValidationError('Invalid publicSignals format. Expected [amount, nullifier, commitment].');
+  if (signals.length < 3) {
+    throw new ValidationError('publicSignals must be [amount, nullifier, commitment].');
   }
 
-  const extractedNullifier = signalsArray[1];
-  const exportedCommitment = signalsArray[2]; // ZK identity hash
+  const nullifier  = signals[1];
+  const commitment = signals[2];
 
-  // Verify the user exists before proceeding
+  // Step 3 — Verify sender exists and commitment matches their registered identity
   const sender = await prisma.user.findUnique({
-    where: { id: fromUserId },
-    select: { id: true, identityHash: true }
+    where:  { id: fromUserId },
+    select: { id: true, identityHash: true },
   });
 
-  if (!sender) {
-    throw new NotFoundError(`Sender wallet not found for ID: ${fromUserId}`);
+  if (!sender) throw new NotFoundError(`Sender not found: ${fromUserId}`);
+  if (sender.identityHash !== commitment) {
+    throw new ProofError("Proof commitment does not match the sender's registered identity.");
   }
 
-  // Cross-check that the commitment in the proof matches the user's registered identityHash
-  // This ensures a user can't submit a valid proof generated for a different wallet
-  if (sender.identityHash !== exportedCommitment) {
-    throw new ProofError('Proof commitment does not match the sender\'s registered identity.');
+  // Step 4 — Double-spend check
+  const usedNullifier = await prisma.nullifier.findUnique({ where: { nullifier } });
+  if (usedNullifier) {
+    throw new ProofError('Payment already processed (double-spend detected).');
   }
 
-  // ── 3. Check nullifier in database ──────────────────────────────────────────
-  const existingNullifier = await prisma.nullifier.findUnique({
-    where: { nullifier: extractedNullifier }
-  });
+  // Step 5 — Verify ZK proof (uses mock mode unless USE_REAL_ZK_PROOFS=true)
+  const isValid = await verifyZKProof(proof, signals);
+  if (!isValid) throw new ProofError('Invalid proof — mathematical verification failed.');
 
-  if (existingNullifier) {
-    throw new ProofError('Payment already processed (Double-spend detected). Please generate a new proof.');
-  }
-
-  // ── 4. Verify ZK proof using proofVerifier utility ──────────────────────────
-  console.log(`[Payment] Verifying ZK Proof for nullifier ${extractedNullifier.substring(0, 8)}...`);
-  const isProofValid = await verifyZKProof(proof, signalsArray);
-
-  if (!isProofValid) {
-    throw new ProofError('Invalid proof. Mathematical verification failed.');
-  }
-
-  // ── 5 & 6 & 7. Execute Payment Transaction Flow ─────────────────────────────
-  // We use a Prisma interactive transaction. If the Payment Engine fails,
-  // we do not record the nullifier or transaction, effectively rolling back.
-  let transactionId = null;
+  // Step 6 — Atomically record the nullifier and create the transaction
+  let transactionId;
 
   try {
     await prisma.$transaction(async (tx) => {
-      // Step A: Store nullifier to immediately lock this proof from being reused
-      await tx.nullifier.create({
-        data: {
-          nullifier: extractedNullifier,
-          userId: fromUserId,
-        }
-      });
+      // Lock nullifier first to prevent race conditions
+      await tx.nullifier.create({ data: { nullifier, userId: fromUserId } });
 
-      console.log(`[Payment] Nullifier recorded. Calling Payment Engine...`);
-
-      // Step B: Call payment engine (Sahil's service)
-      const paymentEngineUrl = config.paymentEngineUrl || 'http://localhost:3003/process-payment';
-      
+      // Optionally ping the external payment engine (graceful fallback if offline)
+      const engineUrl = config.paymentEngineUrl || 'http://localhost:3003/process-payment';
       try {
-        const engineResponse = await axios.post(
-          paymentEngineUrl,
-          {
-            fromUserId,
-            toAddress,
-            amount,
-            proofHash: exportedCommitment // Sending commitment as proof of identity/authorization
-          },
-          { timeout: 3000 } // Reduced timeout to 3 seconds for faster fallback
-        );
-
-        if (!engineResponse.data.success) {
-          // If the engine explicitly rejects it, throw an error to trigger rollback
-          throw new Error(engineResponse.data.error || 'Payment Engine rejected the transfer.');
-        }
-
-        console.log(`[Payment] Engine successfully processed payment.`);
-      } catch (engineError) {
-        // Log the failure but DO NOT throw — gracefully fallback to a mock success for the hackathon
-        console.warn(`[Payment] ⚠️ External Payment Engine unreachable (${engineError.message}). Mocking success for demo purposes.`);
+        const response = await axios.post(engineUrl, { fromUserId, toAddress, amount }, { timeout: 3000 });
+        if (!response.data.success) throw new Error(response.data.error);
+      } catch {
+        // External engine unavailable — continue with DB record only (hackathon fallback)
+        console.warn('[Payment] External engine unreachable — mock success applied.');
       }
 
-      // Step C: Create transaction record
+      // Record transaction
       const dbTx = await tx.transaction.create({
-        data: {
-          fromUserId,
-          amount,
-          proofHash: exportedCommitment, // Using commitment as the unique identifier for this tx proof
-          merchantId: toAddress,
-          status: 'completed',
-        }
+        data: { fromUserId, amount, proofHash: commitment, merchantId: toAddress, status: 'completed' },
       });
-
       transactionId = dbTx.id;
-    }); // ── End Database Transaction ──
-
-  } catch (error) {
-    // If we land here, either Prisma failed or the Payment Engine threw an error
-    // Either way, the Nullifier was never permanently saved (rolled back).
-    throw new Error(error.message);
+    });
+  } catch (err) {
+    throw new Error(err.message);
   }
 
-    // ── 8. Return success response ──────────────────────────────────────────────
-  console.log(`[Payment] Payment Complete! Transaction ID: ${transactionId}`);
-
-  res.status(200).json({
-    success: true,
-    transactionId,
-    message: 'Payment verified and processed successfully.'
-  });
+  res.status(200).json({ success: true, transactionId, message: 'Payment processed successfully.' });
 };
 
-/**
- * 2. Get Transaction Status
- * GET /api/payment/status/:txId
- */
+// ── getPaymentStatus ──────────────────────────────────────────────────────────
+// GET /api/payment/status/:txId
 const getPaymentStatus = async (req, res) => {
-  const { txId } = req.params;
-
-  const transaction = await prisma.transaction.findUnique({
-    where: { id: txId },
-    select: { id: true, status: true, amount: true, createdAt: true, merchantId: true }
+  const tx = await prisma.transaction.findUnique({
+    where:  { id: req.params.txId },
+    select: { id: true, status: true, amount: true, createdAt: true, merchantId: true },
   });
 
-  if (!transaction) {
-    throw new NotFoundError('Transaction not found');
-  }
+  if (!tx) throw new NotFoundError('Transaction not found.');
 
-  res.json({
-    success: true,
-    transaction
-  });
+  res.json({ success: true, transaction: tx });
 };
 
-/**
- * 3. Get User Transaction History
- * GET /api/payment/history/:userId
- */
+// ── getUserHistory ────────────────────────────────────────────────────────────
+// GET /api/payment/history/:userId
 const getUserHistory = async (req, res) => {
   const { userId } = req.params;
 
-  // Validate user exists
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new NotFoundError('User not found');
+  if (!user) throw new NotFoundError('User not found.');
 
   const history = await prisma.transaction.findMany({
-    where: { fromUserId: userId },
+    where:   { fromUserId: userId },
     orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      amount: true,
-      merchantId: true,
-      status: true,
-      createdAt: true
-    }
+    select:  { id: true, amount: true, merchantId: true, status: true, createdAt: true },
   });
 
-  res.json({
-    success: true,
-    count: history.length,
-    transactions: history
-  });
+  res.json({ success: true, count: history.length, transactions: history });
 };
 
-module.exports = {
-  submitPayment,
-  getPaymentStatus,
-  getUserHistory
-};
+module.exports = { submitPayment, getPaymentStatus, getUserHistory };

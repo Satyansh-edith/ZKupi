@@ -1,72 +1,44 @@
 /**
- * Merchant Routes — /api/merchant
- * ================================
- * Register and query merchants in the ZK-UPI network.
- * Note: The Merchant table was removed from the schema, so we mock it.
+ * Merchant Routes  (/api/merchant)
+ * ---------------------------------
+ * Register and look up merchants in the ZK-UPI network.
+ *
+ * NOTE: Uses an in-memory store (Map) for the hackathon demo.
+ * In production, replace with a Prisma Merchant model and database table.
  */
 
-const express = require("express");
+const express = require('express');
 const router  = express.Router();
-const { v4: uuidv4 } = require("uuid");
+const { v4: uuidv4 } = require('uuid');
+const { asyncHandler, ValidationError, NotFoundError } = require('../utils/errorHandler');
 
-// Memory store for hackathon demo
-const merchants = new Map();
+// In-memory merchant store (survives restarts via process memory only)
+const merchantStore = new Map();
 
-// ─── POST /api/merchant/create ────────────────────────────────────────────────
-router.post("/create", async (req, res, next) => {
-  try {
-    const { name } = req.body;
+// ── POST /api/merchant/create ─────────────────────────────────────────────────
+router.post('/create', asyncHandler(async (req, res) => {
+  const { name } = req.body;
 
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        error: "Required fields: name",
-      });
-    }
-
-    const merchantId = "store_" + uuidv4().split("-")[0];
-
-    const merchant = {
-      id: uuidv4(),
-      name,
-      merchantId,
-      balance: 0,
-      isActive: true,
-      createdAt: new Date(),
-    };
-
-    merchants.set(merchantId, merchant);
-
-    console.log(`[Merchant] Registered: ${merchantId} (${name})`);
-
-    res.status(201).json({
-      success: true,
-      message: "Merchant registered successfully",
-      merchant,
-    });
-  } catch (err) {
-    next(err);
+  if (!name || typeof name !== 'string') {
+    throw new ValidationError('name is required.');
   }
-});
 
-// ─── GET /api/merchant/:merchantId ───────────────────────────────────────────
-router.get("/:merchantId", async (req, res, next) => {
-  try {
-    const { merchantId } = req.params;
+  const merchantId = 'merchant_' + uuidv4().split('-')[0];
+  const merchant   = { merchantId, name, createdAt: new Date().toISOString() };
 
-    const merchant = merchants.get(merchantId);
+  merchantStore.set(merchantId, merchant);
 
-    if (!merchant) {
-      return res.status(404).json({
-        success: false,
-        error:   `Merchant '${merchantId}' not found (mock store)`,
-      });
-    }
+  res.status(201).json({ success: true, merchant });
+}));
 
-    res.json({ success: true, merchant });
-  } catch (err) {
-    next(err);
-  }
-});
+// ── GET /api/merchant/:merchantId ─────────────────────────────────────────────
+router.get('/:merchantId', asyncHandler(async (req, res) => {
+  const { merchantId } = req.params;
+  const merchant = merchantStore.get(merchantId);
+
+  if (!merchant) throw new NotFoundError(`Merchant '${merchantId}' not found.`);
+
+  res.json({ success: true, merchant });
+}));
 
 module.exports = router;

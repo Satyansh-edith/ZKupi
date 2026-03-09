@@ -1,43 +1,22 @@
 /**
- * Identity Routes — /api/identity
- * ===============================
- * Routes connecting to the identityController.
+ * Identity Routes  (/api/identity)
+ * ----------------------------------
+ * Register a ZK identity using its commitment hash and a public key.
+ * No personal data is ever stored — only cryptographic identifiers.
  */
 
 const express = require('express');
 const router  = express.Router();
-
-// Import the async wrapper to eliminate try/catch blocks
 const { asyncHandler } = require('../utils/errorHandler');
+const { createIdentity, getIdentity, deleteIdentity } = require('../controllers/identityController');
 
-// Import controller functions
-const {
-  createIdentity,
-  getIdentity,
-  deleteIdentity,
-} = require('../controllers/identityController');
+// POST /api/identity/create  — register a new ZK identity
+router.post('/create',        asyncHandler(createIdentity));
 
-// ── Routing ───────────────────────────────────────────────────────────────────
+// GET  /api/identity/:userId  — retrieve a user's public key
+router.get('/:userId',        asyncHandler(getIdentity));
 
-/**
- * POST /api/identity/create
- * Creates a new anonymous user identity.
- * Expects: { identityHash: string, publicKey: string }
- */
-router.post('/create', asyncHandler(createIdentity));
-
-/**
- * GET /api/identity/:userId
- * Retrieves the public key for a given user ID.
- */
-router.get('/:userId', asyncHandler(getIdentity));
-
-/**
- * DELETE /api/identity/:userId
- * Deletes a user identity permanently.
- */
-router.delete('/:userId', asyncHandler(deleteIdentity));
-
-// ── Exports ───────────────────────────────────────────────────────────────────
+// DELETE /api/identity/:userId  — remove an identity (no transactions must exist)
+router.delete('/:userId',     asyncHandler(deleteIdentity));
 
 module.exports = router;
