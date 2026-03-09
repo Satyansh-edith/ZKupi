@@ -5,8 +5,8 @@ import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import SHA256 from "crypto-js/sha256"
 import { v4 as uuidv4 } from "uuid"
-import { 
-  ShieldCheckIcon, 
+import {
+  ShieldCheckIcon,
   KeyIcon,
   DocumentDuplicateIcon,
   EyeIcon,
@@ -25,10 +25,10 @@ export default function WalletPage() {
 
   async function generateWallet() {
     setLoading(true)
-    
+
     // Simulate loading for better UX
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
+
     const secret = uuidv4()
     const commitment = SHA256(secret).toString()
 
@@ -45,6 +45,9 @@ export default function WalletPage() {
     const data = await res.json()
 
     localStorage.setItem("zk_secret", secret)
+    if (data.wallet?.id) {
+      localStorage.setItem("zk_user_id", data.wallet.id)
+    }
 
     setWallet({
       secret,
@@ -64,26 +67,27 @@ export default function WalletPage() {
     if (window.confirm('Are you sure you want to reset? Your current wallet will be lost.')) {
       setWallet(null)
       localStorage.removeItem("zk_secret")
+      localStorage.removeItem("zk_user_id")
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-2xl mx-auto"
       >
         {/* Header with back button */}
         <div className="flex items-center justify-between mb-8">
-          <Link 
+          <Link
             href="/"
             className="group flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
           >
             <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span>Back to Home</span>
           </Link>
-          
+
           {wallet && (
             <button
               onClick={resetWallet}
@@ -95,7 +99,7 @@ export default function WalletPage() {
         </div>
 
         {/* Main Card */}
-        <motion.div 
+        <motion.div
           className="bg-white rounded-3xl shadow-2xl shadow-blue-100/50 overflow-hidden border border-gray-100"
           layout
         >
@@ -124,7 +128,7 @@ export default function WalletPage() {
                   <ExclamationTriangleIcon className="w-4 h-4 text-blue-600" />
                 </div>
                 <p className="text-sm text-gray-600">
-                  Your wallet is generated locally. The secret key is stored only in your browser. 
+                  Your wallet is generated locally. The secret key is stored only in your browser.
                   Never share your secret with anyone!
                 </p>
               </div>
@@ -138,11 +142,11 @@ export default function WalletPage() {
                 className="text-center py-12"
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.1, 1],
                     rotate: [0, 5, -5, 0]
                   }}
-                  transition={{ 
+                  transition={{
                     duration: 2,
                     repeat: Infinity,
                     repeatType: "reverse"
@@ -194,7 +198,7 @@ export default function WalletPage() {
                   transition={{ duration: 0.3 }}
                 >
                   {/* Balance Card */}
-                  <motion.div 
+                  <motion.div
                     className="mb-8 p-6 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl text-white shadow-lg"
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300 }}
@@ -321,7 +325,7 @@ export default function WalletPage() {
         </motion.div>
 
         {/* Security Tips */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}

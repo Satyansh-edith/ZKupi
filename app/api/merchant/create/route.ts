@@ -1,24 +1,24 @@
 import { NextResponse } from "next/server"
-import { connectDB } from "../../../../lib/db"
-import Merchant from "../../../../models/Merchant"
-import crypto from "crypto"
 
 export async function POST(req: Request) {
+  try {
+    const body = await req.json()
+    
+    // Pass the merchant name to the backend
+    const res = await fetch("http://localhost:4000/api/merchant/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: body.name })
+    })
 
-  await connectDB()
+    const data = await res.json()
+    
+    if (!res.ok) {
+        return NextResponse.json({ error: data.error || "Backend error" }, { status: res.status })
+    }
 
-  const { name } = await req.json()
-
-  const merchantId = crypto.randomUUID()
-
-  const merchant = await Merchant.create({
-    name,
-    merchantId,
-    balance: 0
-  })
-
-  return NextResponse.json({
-    success: true,
-    merchant
-  })
+    return NextResponse.json(data)
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

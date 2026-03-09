@@ -1,0 +1,82 @@
+// ZK-UPI Prisma Schema
+// Database: SQLite (zero-config, perfect for hackathons)
+//
+// Migration commands:
+//   npx prisma migrate dev --name init        (first time setup)
+//   npx prisma migrate dev --name <name>      (after schema changes)
+//   npx prisma migrate deploy                 (production)
+//   npx prisma studio                         (visual DB browser)
+//   npx prisma db push                        (push schema without migration history)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// User — stores an anonymous identity (no name/email/phone)
+// The identityHash is derived from the user's secret key via
+// a one-way hash, so the real identity is never stored.
+// ─────────────────────────────────────────────────────────────
+model User {
+  id           String   @id @default(uuid())
+  identityHash String   @unique               // SHA-256(secret) — the ZK commitment
+  publicKey    String                         // For on-chain / off-chain verification
+  createdAt    DateTime @default(now())
+
+  // Relations
+  nullifiers   Nullifier[]
+  transactions Transaction[]
+
+  @@index([identityHash])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Nullifier — one-time-use token that prevents double-spending
+// Once a nullifier is recorded, the same proof cannot be
+// replayed. This is the core double-spend prevention mechanism.
+// ─────────────────────────────────────────────────────────────
+model Nullifier {
+  id         String   @id @default(uuid())
+  nullifier  String   @unique               // One-time token derived from proof
+  userId     String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([nullifier])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Transaction — an on-chain-style payment record
+// The proofHash links to the ZK proof that authorized this
+// payment. The sender is identified only by their anonymous
+// userId, never by a real-world identity.
+//
+// Status values: "pending" | "completed" | "failed"
+// (String type used for SQLite compatibility — SQLite does
+//  not support native enums like PostgreSQL does.)
+// ─────────────────────────────────────────────────────────────
+model Transaction {
+  id         String   @id @default(uuid())
+  fromUserId String
+  amount     Int                            // Amount in smallest unit (paise)
+  proofHash  String   @unique               // ZK proof commitment — ensures each proof used once
+  merchantId String                         // Receiver identifier (can be hashed for privacy)
+  status     String   @default("pending")  // "pending" | "completed" | "failed"
+  createdAt  DateTime @default(now())
+
+  // Relations
+  fromUser   User     @relation(fields: [fromUserId], references: [id], onDelete: Restrict)
+
+  @@index([fromUserId])
+  @@index([merchantId])
+  @@index([status])
+  @@index([createdAt])
+}

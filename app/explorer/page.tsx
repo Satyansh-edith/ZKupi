@@ -43,16 +43,16 @@ export default function ExplorerPage() {
   useEffect(() => {
     if (transactions.length > 0) {
       // Filter transactions based on search
-      const filtered = transactions.filter(tx => 
+      const filtered = transactions.filter(tx =>
         tx.commitment.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tx.merchantId.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tx.amount.toString().includes(searchTerm)
       )
-      
+
       // Sort transactions
       const sorted = [...filtered].sort((a, b) => {
         if (sortConfig.key === 'timestamp') {
-          return sortConfig.direction === 'asc' 
+          return sortConfig.direction === 'asc'
             ? a.timestamp - b.timestamp
             : b.timestamp - a.timestamp
         }
@@ -63,7 +63,7 @@ export default function ExplorerPage() {
         }
         return 0
       })
-      
+
       setFilteredTransactions(sorted)
     }
   }, [transactions, searchTerm, sortConfig])
@@ -73,13 +73,13 @@ export default function ExplorerPage() {
     try {
       const res = await fetch("/api/transactions")
       const data = await res.json()
-      
+
       setTransactions(data.transactions)
-      
+
       // Calculate stats
       const total = data.transactions.reduce((sum: number, tx: any) => sum + tx.amount, 0)
       const uniqueMerchants = new Set(data.transactions.map((tx: any) => tx.merchantId)).size
-      
+
       setStats({
         totalTransactions: data.transactions.length,
         totalVolume: total,
@@ -95,7 +95,7 @@ export default function ExplorerPage() {
 
   const formatTimeAgo = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000)
-    
+
     if (seconds < 60) return `${seconds} seconds ago`
     if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`
     if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
@@ -124,14 +124,14 @@ export default function ExplorerPage() {
       <div className="relative max-w-7xl mx-auto py-12 px-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <Link 
+          <Link
             href="/"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition-colors group"
           >
             <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span>Back to Home</span>
           </Link>
-          
+
           <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-full border border-indigo-100">
             <DocumentMagnifyingGlassIcon className="w-4 h-4 text-indigo-600" />
             <span className="text-xs font-medium text-gray-600">Transaction Explorer</span>
@@ -139,7 +139,7 @@ export default function ExplorerPage() {
         </div>
 
         {/* Title Section */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
@@ -148,13 +148,13 @@ export default function ExplorerPage() {
             Privacy Transaction Explorer
           </h1>
           <p className="text-gray-500 text-lg max-w-2xl">
-            Explore anonymous transactions on the ZK-UPI network. All transactions are publicly verifiable 
+            Explore anonymous transactions on the ZK-UPI network. All transactions are publicly verifiable
             while maintaining complete payer privacy.
           </p>
         </motion.div>
 
         {/* Stats Dashboard */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -168,7 +168,7 @@ export default function ExplorerPage() {
             <p className="text-2xl font-bold text-gray-800">{stats.totalTransactions}</p>
             <p className="text-sm text-gray-500">Transactions</p>
           </div>
-          
+
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between mb-2">
               <CurrencyDollarIcon className="w-8 h-8 text-green-500" />
@@ -177,7 +177,7 @@ export default function ExplorerPage() {
             <p className="text-2xl font-bold text-gray-800">₹{stats.totalVolume.toLocaleString()}</p>
             <p className="text-sm text-gray-500">Total Volume</p>
           </div>
-          
+
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between mb-2">
               <BuildingStorefrontIcon className="w-8 h-8 text-purple-500" />
@@ -186,7 +186,7 @@ export default function ExplorerPage() {
             <p className="text-2xl font-bold text-gray-800">{stats.uniqueMerchants}</p>
             <p className="text-sm text-gray-500">Unique Merchants</p>
           </div>
-          
+
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between mb-2">
               <ClockIcon className="w-8 h-8 text-amber-500" />
@@ -198,7 +198,7 @@ export default function ExplorerPage() {
         </motion.div>
 
         {/* Privacy Explanation Panel */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -214,8 +214,8 @@ export default function ExplorerPage() {
                 <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">ZK-Powered</span>
               </h2>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Transactions are recorded using cryptographic commitments instead of user identities. 
-                This allows payments to be verified without revealing who made the payment. Each transaction 
+                Transactions are recorded using cryptographic commitments instead of user identities.
+                This allows payments to be verified without revealing who made the payment. Each transaction
                 is publicly visible but the payer remains completely anonymous.
               </p>
             </div>
@@ -223,7 +223,7 @@ export default function ExplorerPage() {
         </motion.div>
 
         {/* Search and Filter Bar */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -239,7 +239,7 @@ export default function ExplorerPage() {
               className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-400 focus:outline-none transition-all shadow-sm"
             />
           </div>
-          
+
           <button
             onClick={() => loadTransactions()}
             className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
@@ -250,7 +250,7 @@ export default function ExplorerPage() {
         </motion.div>
 
         {/* Transactions Table Card */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
@@ -262,7 +262,7 @@ export default function ExplorerPage() {
               <thead className="bg-gradient-to-r from-gray-50 to-indigo-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    <button 
+                    <button
                       onClick={() => toggleSort('commitment')}
                       className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
                     >
@@ -274,7 +274,7 @@ export default function ExplorerPage() {
                     Merchant ID
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    <button 
+                    <button
                       onClick={() => toggleSort('amount')}
                       className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
                     >
@@ -288,7 +288,7 @@ export default function ExplorerPage() {
                     </button>
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">
-                    <button 
+                    <button
                       onClick={() => toggleSort('timestamp')}
                       className="flex items-center gap-2 hover:text-indigo-600 transition-colors"
                     >
@@ -309,7 +309,7 @@ export default function ExplorerPage() {
                   </th>
                 </tr>
               </thead>
-              
+
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   // Loading skeleton
@@ -334,7 +334,7 @@ export default function ExplorerPage() {
                   ))
                 ) : filteredTransactions.length > 0 ? (
                   filteredTransactions.map((tx, i) => (
-                    <motion.tr 
+                    <motion.tr
                       key={i}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -368,7 +368,7 @@ export default function ExplorerPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <button 
+                        <button
                           className="p-1 hover:bg-indigo-100 rounded-lg transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -425,7 +425,7 @@ export default function ExplorerPage() {
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-4">
                   <h3 className="text-lg font-semibold text-white">Transaction Details</h3>
                 </div>
-                
+
                 <div className="p-6">
                   <div className="space-y-4">
                     <div>
@@ -434,7 +434,7 @@ export default function ExplorerPage() {
                         {selectedTx.commitment}
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs text-gray-500 block mb-1">Merchant ID</label>
@@ -449,7 +449,7 @@ export default function ExplorerPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="text-xs text-gray-500 block mb-1">Timestamp</label>
                       <div className="p-3 bg-gray-50 rounded-lg text-sm">
@@ -460,12 +460,12 @@ export default function ExplorerPage() {
                     <div className="mt-4 p-3 bg-indigo-50 rounded-lg flex items-start gap-2">
                       <InformationCircleIcon className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" />
                       <p className="text-xs text-indigo-700">
-                        This transaction is publicly visible but the payer remains anonymous. 
+                        This transaction is publicly visible but the payer remains anonymous.
                         The commitment hash cannot be linked to any identity.
                       </p>
                     </div>
                   </div>
-                  
+
                   <button
                     onClick={() => setSelectedTx(null)}
                     className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl hover:shadow-lg transition-all"

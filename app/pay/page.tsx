@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
+import {
   CurrencyDollarIcon,
   ShieldCheckIcon,
   QrCodeIcon,
@@ -43,10 +43,10 @@ export default function PayPage() {
 
     setLoading(true)
     setError(null)
-    
+
     try {
       const secret = localStorage.getItem("zk_secret")
-      
+
       if (!secret) {
         setError("Wallet not found. Please create a wallet first.")
         setLoading(false)
@@ -65,7 +65,7 @@ export default function PayPage() {
       })
 
       const data = await res.json()
-      
+
       if (res.ok) {
         setResult(data)
         setShowPreview(false)
@@ -93,12 +93,12 @@ export default function PayPage() {
   if (!hasWallet) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md w-full"
         >
-          <Link 
+          <Link
             href="/"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors mb-8 group"
           >
@@ -110,14 +110,14 @@ export default function PayPage() {
             <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl flex items-center justify-center shadow-lg">
               <ExclamationTriangleIcon className="w-10 h-10 text-white" />
             </div>
-            
+
             <h2 className="text-2xl font-bold text-gray-800 mb-3">
               No Wallet Found
             </h2>
             <p className="text-gray-500 mb-8">
               You need to create an anonymous wallet before making payments.
             </p>
-            
+
             <Link
               href="/wallet"
               className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:shadow-lg transition-all"
@@ -138,21 +138,21 @@ export default function PayPage() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-lg mx-auto relative"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <Link 
+          <Link
             href="/wallet"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors group"
           >
             <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span>Back to Wallet</span>
           </Link>
-          
+
           <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-blue-100">
             <ShieldCheckIcon className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-medium text-gray-600">Anonymous Payment</span>
@@ -160,7 +160,7 @@ export default function PayPage() {
         </div>
 
         {/* Main Card */}
-        <motion.div 
+        <motion.div
           className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-blue-200/50 overflow-hidden border border-white/50"
           layout
         >
@@ -168,7 +168,7 @@ export default function PayPage() {
           <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-10 overflow-hidden">
             <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mt-8"></div>
             <div className="absolute left-0 bottom-0 w-24 h-24 bg-white/10 rounded-full -ml-8 -mb-8"></div>
-            
+
             <div className="relative flex items-center gap-4">
               <div className="p-3 bg-white/20 rounded-2xl">
                 <QrCodeIcon className="w-8 h-8 text-white" />
@@ -204,7 +204,7 @@ export default function PayPage() {
                   step="1"
                 />
               </div>
-              
+
               {/* Suggested amounts */}
               <div className="flex flex-wrap gap-2 mt-3">
                 {suggestedAmounts.map((suggested) => (
@@ -221,7 +221,7 @@ export default function PayPage() {
 
             {/* Amount Preview */}
             {amount && Number(amount) > 0 && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100"
@@ -252,7 +252,7 @@ export default function PayPage() {
             <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 flex items-start gap-3">
               <LockClosedIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-amber-700">
-                Your identity remains private. The payment will be verified using zero-knowledge proofs 
+                Your identity remains private. The payment will be verified using zero-knowledge proofs
                 without revealing your wallet information.
               </p>
             </div>
@@ -361,7 +361,7 @@ export default function PayPage() {
         </AnimatePresence>
 
         {/* Security Tips */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}

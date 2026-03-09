@@ -68,9 +68,10 @@ export default function MerchantPayContent() {
     
     try {
       const secret = localStorage.getItem("zk_secret")
+      const userId = localStorage.getItem("zk_user_id")
       
-      if (!secret) {
-        setError("Wallet not found. Please create a wallet first.")
+      if (!secret || !userId) {
+        setError("Wallet identity not found. Please reset and create a new wallet first.")
         setLoading(false)
         return
       }
@@ -82,6 +83,7 @@ export default function MerchantPayContent() {
         },
         body: JSON.stringify({
           secret,
+          userId,
           amount: Number(amount),
           merchantId
         })

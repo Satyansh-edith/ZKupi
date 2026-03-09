@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server"
-import { connectDB } from "@/lib/db"
-import Transaction from "@/models/Transaction"
 
 export async function GET() {
+  try {
+    const res = await fetch("http://localhost:4000/api/transactions", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    })
 
-  await connectDB()
+    const data = await res.json()
+    
+    if (!res.ok) {
+        return NextResponse.json(data, { status: res.status })
+    }
 
-  const transactions = await Transaction
-    .find()
-    .sort({ timestamp: -1 })
-    .limit(50)
-
-  return NextResponse.json({
-    transactions
-  })
+    return NextResponse.json(data)
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

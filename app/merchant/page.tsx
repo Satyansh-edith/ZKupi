@@ -27,9 +27,9 @@ export default function MerchantPage() {
 
   const createMerchant = async () => {
     if (!name.trim()) return
-    
+
     setLoading(true)
-    
+
     try {
       const res = await fetch("/api/merchant/create", {
         method: "POST",
@@ -56,51 +56,51 @@ export default function MerchantPage() {
   }
 
   const downloadQR = () => {
-  // Get the SVG element
-  const svg = document.getElementById('merchant-qr')
-  if (svg) {
-    // Create a canvas element
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    
-    // Create an image from the SVG
-    const img = new Image()
-    const svgData = new XMLSerializer().serializeToString(svg)
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(svgBlob)
-    
-    img.onload = () => {
-      // Set canvas dimensions
-      canvas.width = img.width
-      canvas.height = img.height
-      
-      // Draw image on canvas
-      ctx?.drawImage(img, 0, 0)
-      
-      // Convert to PNG and download
-      const pngUrl = canvas.toDataURL('image/png')
-      const link = document.createElement('a')
-      link.download = `merchant-${merchant.merchantId}.png`
-      link.href = pngUrl
-      link.click()
-      
-      // Clean up
-      URL.revokeObjectURL(url)
-    }
-    
-    img.src = url
-  }
-}
-
-const printQR = () => {
-  const printWindow = window.open('', '_blank')
-  if (printWindow && merchant) {
     // Get the SVG element
     const svg = document.getElementById('merchant-qr')
     if (svg) {
+      // Create a canvas element
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+
+      // Create an image from the SVG
+      const img = new Image()
       const svgData = new XMLSerializer().serializeToString(svg)
-      
-      printWindow.document.write(`
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+
+      img.onload = () => {
+        // Set canvas dimensions
+        canvas.width = img.width
+        canvas.height = img.height
+
+        // Draw image on canvas
+        ctx?.drawImage(img, 0, 0)
+
+        // Convert to PNG and download
+        const pngUrl = canvas.toDataURL('image/png')
+        const link = document.createElement('a')
+        link.download = `merchant-${merchant.merchantId}.png`
+        link.href = pngUrl
+        link.click()
+
+        // Clean up
+        URL.revokeObjectURL(url)
+      }
+
+      img.src = url
+    }
+  }
+
+  const printQR = () => {
+    const printWindow = window.open('', '_blank')
+    if (printWindow && merchant) {
+      // Get the SVG element
+      const svg = document.getElementById('merchant-qr')
+      if (svg) {
+        const svgData = new XMLSerializer().serializeToString(svg)
+
+        printWindow.document.write(`
         <html>
           <head>
             <title>Merchant QR Code - ${merchant.name}</title>
@@ -155,15 +155,15 @@ const printQR = () => {
           </body>
         </html>
       `)
-      printWindow.document.close()
-      
-      // Wait for content to load then print
-      setTimeout(() => {
-        printWindow.print()
-      }, 250)
+        printWindow.document.close()
+
+        // Wait for content to load then print
+        setTimeout(() => {
+          printWindow.print()
+        }, 250)
+      }
     }
   }
-}
   const resetForm = () => {
     setStep('form')
     setName("")
@@ -181,14 +181,14 @@ const printQR = () => {
       <div className="relative max-w-2xl mx-auto py-12 px-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <Link 
+          <Link
             href="/"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors group"
           >
             <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span>Back to Home</span>
           </Link>
-          
+
           <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-full border border-emerald-100">
             <BuildingStorefrontIcon className="w-4 h-4 text-emerald-600" />
             <span className="text-xs font-medium text-gray-600">Merchant Onboarding</span>
@@ -205,18 +205,18 @@ const printQR = () => {
               exit={{ opacity: 0, y: -20 }}
             >
               {/* Hero Section */}
-              <motion.div 
+              <motion.div
                 className="text-center mb-12"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.1, 1],
                     rotate: [0, 5, -5, 0]
                   }}
-                  transition={{ 
+                  transition={{
                     duration: 3,
                     repeat: Infinity,
                     repeatType: "reverse"
@@ -235,7 +235,7 @@ const printQR = () => {
               </motion.div>
 
               {/* Main Card */}
-              <motion.div 
+              <motion.div
                 className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-emerald-100/50 overflow-hidden border border-white/50"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -321,7 +321,7 @@ const printQR = () => {
               </motion.div>
 
               {/* Info Panel */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
@@ -334,7 +334,7 @@ const printQR = () => {
                   <div>
                     <h3 className="font-semibold text-gray-800 mb-1">Why become a merchant?</h3>
                     <p className="text-sm text-gray-500">
-                      Accept payments anonymously with zero-knowledge proofs. Your customers' privacy is protected 
+                      Accept payments anonymously with zero-knowledge proofs. Your customers' privacy is protected
                       while you receive instant, verified payments. No identity data stored, just pure transactions.
                     </p>
                   </div>
@@ -351,7 +351,7 @@ const printQR = () => {
                 exit={{ opacity: 0, scale: 0.9 }}
               >
                 {/* Success Header */}
-                <motion.div 
+                <motion.div
                   className="text-center mb-8"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -373,7 +373,7 @@ const printQR = () => {
                 </motion.div>
 
                 {/* QR Code Card */}
-                <motion.div 
+                <motion.div
                   className="bg-white rounded-3xl shadow-2xl shadow-emerald-100/50 overflow-hidden border border-gray-100"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -420,7 +420,7 @@ const printQR = () => {
 
                     {/* QR Code */}
                     <div className="flex flex-col items-center">
-                      <motion.div 
+                      <motion.div
                         className="relative p-6 bg-white rounded-2xl shadow-xl border-2 border-emerald-100"
                         whileHover={{ scale: 1.02 }}
                         transition={{ type: "spring", stiffness: 300 }}
@@ -455,7 +455,7 @@ const printQR = () => {
                         <ArrowDownTrayIcon className="w-5 h-5 text-gray-500 group-hover:text-emerald-500" />
                         <span className="text-xs text-gray-500 group-hover:text-emerald-600">Download</span>
                       </motion.button>
-                      
+
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -465,7 +465,7 @@ const printQR = () => {
                         <PrinterIcon className="w-5 h-5 text-gray-500 group-hover:text-emerald-500" />
                         <span className="text-xs text-gray-500 group-hover:text-emerald-600">Print</span>
                       </motion.button>
-                      
+
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -474,7 +474,7 @@ const printQR = () => {
                             title: `${merchant.name} Payment QR`,
                             text: `Pay ${merchant.name} anonymously`,
                             url: `${window.location.origin}/pay/merchant?merchantId=${merchant.merchantId}`
-                          }).catch(() => {})
+                          }).catch(() => { })
                         }}
                         className="flex flex-col items-center gap-2 p-3 bg-gray-50 rounded-xl hover:bg-emerald-50 transition-colors group"
                       >
@@ -498,7 +498,7 @@ const printQR = () => {
                 </motion.div>
 
                 {/* Quick Stats */}
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}

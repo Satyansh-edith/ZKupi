@@ -1,0 +1,40 @@
+services:
+  # ZK-UPI Backend Web Service
+  - type: web
+    name: zk-upi-backend
+    env: node
+    region: singapore # Adjust based on user location (e.g., frankfurt, oregon)
+    
+    # Render doesn't natively use package.json scripts for the build process
+    # so we define the build steps exactly as needed for Prisma + SQLite
+    buildCommand: "npm install && npx prisma generate && npx prisma migrate deploy"
+    
+    # We run the compiled production index
+    startCommand: "npm start"
+    
+    # We must explicitly define the Health Check path to ensure zero-downtime deploys
+    healthCheckPath: /health
+    
+    # The environment variables the service expects at runtime
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        value: "file:/data/sqlite.db" # Notice this points to the persistent disk below!
+      - key: FRONTEND_URL
+        # Set this in the Render dashboard to the deployed Vercel/Next.js URL
+        sync: false 
+      - key: PAYMENT_ENGINE_URL
+        # Set this to Sahil's live service URL
+        sync: false
+      - key: USE_REAL_ZK_PROOFS
+        value: "false" # Set to true when actual circuit parameters are provided
+        
+    # CRITICAL: Because SQLite is a file-based database, we MUST attach a persistent disk.
+    # Otherwise, all User, Nullifier, and Transaction data will be wiped on every deploy!
+    disk:
+      name: zk-upi-sqlite-data
+      mountPath: /data
+      sizeGB: 1
