@@ -1,45 +1,65 @@
 /**
- * Proof Routes — /api/verify
- * ===========================
- * Endpoints mapped to the proofController for validating ZK proofs.
+ * Proof Routes  (/api/verify)
+ * ---------------------------
+ * Endpoints for generating and verifying ZK proofs.
+ * The generate endpoint is a convenience helper for demo/hackathon use.
  */
+
+'use strict';
 
 const express = require('express');
 const router  = express.Router();
+const { asyncHandler, ValidationError } = require('../utils/errorHandler');
+const { generateCommitment, generateNullifier, generateSimulatedProof } = require('../lib/zkVerifier');
+const { verifyZKProof, extractPublicSignals } = require('../utils/proofVerifier');
 
-const { asyncHandler } = require('../utils/errorHandler');
-const {
-  verifySingleProof,
-  verifyBatchProofs,
-  getVerificationKey,
-} = require('../controllers/proofController');
+// ── POST /api/verify/generate ─────────────────────────────────────────────────
+// Generates a simulated ZK proof for demo purposes
+router.post('/generate', asyncHandler(async (req, res) => {
+  const { secret, merchantId, amount } = req.body;
 
-// ── Rate Limiting (Placeholder for Production) ────────────────────────────────
-// Real SNARK verification is CPU intensive. In a real app, use express-rate-limit:
-// const rateLimit = require('express-rate-limit');
-// const verifyLimiter = rateLimit({ windowMs: 1 * 60 * 1000, max: 20 });
-const verifyLimiter = (req, res, next) => next();
+  if (!secret || !merchantId || amount === undefined) {
+    throw new ValidationError('secret, merchantId, and amount are required.');
+  }
+  if (typeof amount !== 'number' || amount <= 0) {
+    throw new ValidationError('amount must be a positive number.');
+  }
 
-// ── Routing ───────────────────────────────────────────────────────────────────
+  const commitment          = generateCommitment(secret);
+  const { nullifier, nonce } = generateNullifier(secret, merchantId, amount);
+  const { proof, publicSignals } = generateSimulatedProof(secret, merchantId, amount, nullifier);
 
-/**
- * POST /api/verify/proof
- * Validates a single proof against the public signals.
- */
-router.post('/proof', verifyLimiter, asyncHandler(verifySingleProof));
+  res.json({
+    success: true,
+    proof,
+    publicSignals,
+    nullifier,
+    commitment,
+    nonce,
+    note: 'Simulated proof — for demo/hackathon use only.',
+  });
+}));
 
-/**
- * POST /api/verify/batch
- * Validates an array of proofs concurrently. Max 50 per request.
- */
-router.post('/batch', verifyLimiter, asyncHandler(verifyBatchProofs));
+// ── POST /api/verify/verify ───────────────────────────────────────────────────
+// Verifies a submitted ZK proof
+router.post('/verify', asyncHandler(async (req, res) => {
+  const { proof, publicSignals } = req.body;
 
-/**
- * GET /api/verify/key
- * Returns the public cryptographic curve parameters used by the loaded verification key.
- */
-router.get('/key', asyncHandler(getVerificationKey));
+  if (!proof || !publicSignals) {
+    throw new ValidationError('proof and publicSignals are required.');
+  }
 
-// ── Exports ───────────────────────────────────────────────────────────────────
+  const signals = Array.isArray(publicSignals)
+    ? publicSignals
+    : Object.values(publicSignals);
+
+  const isValid = await verifyZKProof(proof, signals);
+
+  res.json({
+    success:  true,
+    valid:    isValid,
+    message:  isValid ? '✓ Proof is valid.' : '✗ Proof is invalid.',
+  });
+}));
 
 module.exports = router;

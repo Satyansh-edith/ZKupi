@@ -1,348 +1,220 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { motion, AnimatePresence } from "framer-motion"
-import SHA256 from "crypto-js/sha256"
-import { v4 as uuidv4 } from "uuid"
-import {
-  ShieldCheckIcon,
-  KeyIcon,
-  DocumentDuplicateIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  ArrowLeftIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  WalletIcon
-} from '@heroicons/react/24/outline'
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const BACKEND = "http://localhost:4000";
+
+type Wallet = {
+  id: string;
+  commitment: string;
+  balance: number;
+  createdAt?: string;
+};
 
 export default function WalletPage() {
-  const [wallet, setWallet] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState<string | null>(null)
-  const [showSecret, setShowSecret] = useState(false)
+  const [secret, setSecret] = useState("");
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [mode, setMode] = useState<"create" | "unlock">("create");
 
-  async function generateWallet() {
-    setLoading(true)
-
-    // Simulate loading for better UX
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const secret = uuidv4()
-    const commitment = SHA256(secret).toString()
-
-    const res = await fetch("/api/wallet/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        commitment
-      })
-    })
-
-    const data = await res.json()
-
-    localStorage.setItem("zk_secret", secret)
-    if (data.wallet?.id) {
-      localStorage.setItem("zk_user_id", data.wallet.id)
+  const handleSubmit = async () => {
+    if (!secret || secret.length < 8) {
+      setError("Secret must be at least 8 characters long.");
+      return;
     }
-
-    setWallet({
-      secret,
-      commitment,
-      balance: data.wallet.balance
-    })
-    setLoading(false)
-  }
-
-  const copyToClipboard = (text: string, type: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(type)
-    setTimeout(() => setCopied(null), 2000)
-  }
-
-  const resetWallet = () => {
-    if (window.confirm('Are you sure you want to reset? Your current wallet will be lost.')) {
-      setWallet(null)
-      localStorage.removeItem("zk_secret")
-      localStorage.removeItem("zk_user_id")
+    setLoading(true);
+    setError("");
+    try {
+      if (mode === "create") {
+        const res = await fetch(`${BACKEND}/api/wallet/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.setItem("zk_secret", secret);
+          window.location.href = "/user/dashboard";
+        } else setError(data.message || "Failed to create wallet.");
+      } else {
+        const res = await fetch(`${BACKEND}/api/wallet/balance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.setItem("zk_secret", secret);
+          window.location.href = "/user/dashboard";
+        }
+        else setError(data.message || "Wallet not found for this secret.");
+      }
+    } catch {
+      setError("Cannot connect to backend. Make sure the backend is running on port 4000.");
     }
-  }
+    setLoading(false);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl mx-auto"
-      >
-        {/* Header with back button */}
-        <div className="flex items-center justify-between mb-8">
-          <Link
-            href="/"
-            className="group flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
-          >
-            <ArrowLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span>Back to Home</span>
-          </Link>
+    <div style={{ minHeight: "calc(100vh - 72px)", position: "relative", overflow: "hidden" }}>
+      {/* Orbs */}
+      <div className="orb orb-purple" style={{ width: 500, height: 500, top: -100, left: -100 }} />
+      <div className="orb orb-cyan"   style={{ width: 350, height: 350, bottom: 50, right: 0 }} />
 
-          {wallet && (
-            <button
-              onClick={resetWallet}
-              className="text-sm text-red-500 hover:text-red-600 transition-colors"
-            >
-              Reset Wallet
-            </button>
-          )}
-        </div>
+      <div className="page-container" style={{ position: "relative", zIndex: 1, paddingTop: 60, paddingBottom: 80 }}>
+        {/* Header */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: "center", marginBottom: 48 }}>
+          <span className="badge badge-purple" style={{ marginBottom: 16, display: "inline-flex" }}>🔐 Anonymous Wallet</span>
+          <h1 style={{ fontSize: 52, fontWeight: 900, marginBottom: 14 }}>
+            Your <span className="text-gradient-purple">ZK Wallet</span>
+          </h1>
+          <p style={{ fontSize: 17, color: "var(--text-secondary)", maxWidth: 480, margin: "0 auto" }}>
+            Enter a secret phrase to create or access your anonymous wallet. Your secret never leaves your device.
+          </p>
+        </motion.div>
 
-        {/* Main Card */}
-        <motion.div
-          className="bg-white rounded-3xl shadow-2xl shadow-blue-100/50 overflow-hidden border border-gray-100"
-          layout
-        >
-          {/* Card Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-xl">
-                  <WalletIcon className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white">Anonymous Wallet</h1>
-                  <p className="text-blue-100 text-sm">Zero-Knowledge Privacy</p>
-                </div>
-              </div>
-              <ShieldCheckIcon className="w-8 h-8 text-white/80" />
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          {/* Mode Toggle */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <div style={{
+              display: "flex", gap: 6, padding: 6, background: "rgba(255,255,255,0.04)",
+              borderRadius: 12, border: "1px solid var(--border-subtle)", marginBottom: 28,
+            }}>
+              {["create", "unlock"].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { setMode(m as "create" | "unlock"); setWallet(null); setError(""); }}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 14, fontWeight: 600,
+                    background: mode === m ? "linear-gradient(135deg, #8b5cf6, #6d28d9)" : "transparent",
+                    color: mode === m ? "#fff" : "var(--text-muted)",
+                    boxShadow: mode === m ? "0 4px 14px rgba(139,92,246,0.3)" : "none",
+                    transition: "all 0.2s",
+                    border: "none", cursor: "pointer",
+                  }}
+                >
+                  {m === "create" ? "✨ Create Wallet" : "🔓 Unlock Wallet"}
+                </button>
+              ))}
             </div>
-          </div>
+          </motion.div>
 
-          {/* Card Body */}
-          <div className="p-8">
-            {/* Info Banner */}
-            <div className="mb-8 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl border border-blue-100">
-              <div className="flex items-start gap-3">
-                <div className="p-1 bg-blue-100 rounded-lg">
-                  <ExclamationTriangleIcon className="w-4 h-4 text-blue-600" />
-                </div>
-                <p className="text-sm text-gray-600">
-                  Your wallet is generated locally. The secret key is stored only in your browser.
-                  Never share your secret with anyone!
-                </p>
+          {/* Main Card */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass glow-purple" style={{ padding: 36 }}>
+            <div className="form-group" style={{ marginBottom: 24 }}>
+              <label className="form-label">Secret Phrase</label>
+              <input
+                type="password"
+                placeholder="Enter your secret phrase (min. 8 chars)"
+                value={secret}
+                onChange={(e) => { setSecret(e.target.value); setError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                style={{ fontSize: 15, padding: "14px 18px" }}
+              />
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+                💡 This secret is hashed locally. The server only sees your commitment hash.
               </div>
             </div>
 
-            {/* Generate Button */}
-            {!wallet && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-12"
-              >
-                <motion.div
-                  animate={{
-                    scale: [1, 1.1, 1],
-                    rotate: [0, 5, -5, 0]
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    repeatType: "reverse"
-                  }}
-                  className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-400 to-purple-400 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-200"
-                >
-                  <KeyIcon className="w-12 h-12 text-white" />
-                </motion.div>
-
-                <h2 className="text-xl font-semibold text-gray-800 mb-3">
-                  Create Your Anonymous Wallet
-                </h2>
-                <p className="text-gray-500 mb-8 max-w-sm mx-auto">
-                  Generate a new wallet with a unique secret key. Your identity remains completely private.
-                </p>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={generateWallet}
-                  disabled={loading}
-                  className="relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden group"
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating Wallet...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <KeyIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                      Generate New Wallet
-                    </span>
-                  )}
-                </motion.button>
-              </motion.div>
+            {error && (
+              <div className="alert alert-error" style={{ marginBottom: 20 }}>
+                ⚠️ {error}
+              </div>
             )}
 
-            {/* Wallet Details */}
-            <AnimatePresence mode="wait">
-              {wallet && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {/* Balance Card */}
-                  <motion.div
-                    className="mb-8 p-6 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl text-white shadow-lg"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    <p className="text-blue-100 text-sm mb-2">Current Balance</p>
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <span className="text-4xl font-bold">₹{wallet.balance}</span>
-                        <span className="text-blue-100 ml-2">INR</span>
-                      </div>
-                      <div className="p-2 bg-white/20 rounded-xl">
-                        <WalletIcon className="w-6 h-6" />
-                      </div>
-                    </div>
-                  </motion.div>
+            <button
+              className="btn btn-primary"
+              onClick={handleSubmit}
+              disabled={loading}
+              style={{ width: "100%", padding: "14px", fontSize: 16, opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? "⏳ Processing..." : mode === "create" ? "🚀 Create Wallet" : "🔓 Unlock Wallet"}
+            </button>
+          </motion.div>
 
-                  {/* Secret Key Section */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Secret Key
-                    </label>
-                    <div className="relative group">
-                      <div className="w-full p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl font-mono text-sm break-all pr-24">
-                        {showSecret ? wallet.secret : '••••••••••••••••••••••••••••••••'}
-                      </div>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                        <button
-                          onClick={() => setShowSecret(!showSecret)}
-                          className="p-2 hover:bg-white rounded-lg transition-colors"
-                          title={showSecret ? "Hide secret" : "Show secret"}
-                        >
-                          {showSecret ? (
-                            <EyeSlashIcon className="w-4 h-4 text-gray-500" />
-                          ) : (
-                            <EyeIcon className="w-4 h-4 text-gray-500" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => copyToClipboard(wallet.secret, 'secret')}
-                          className="p-2 hover:bg-white rounded-lg transition-colors relative"
-                          title="Copy secret"
-                        >
-                          <DocumentDuplicateIcon className="w-4 h-4 text-gray-500" />
-                          {copied === 'secret' && (
-                            <motion.span
-                              initial={{ opacity: 0, scale: 0.5 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              className="absolute -top-8 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded"
-                            >
-                              Copied!
-                            </motion.span>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                      <ExclamationTriangleIcon className="w-3 h-3" />
-                      Save this secret! You'll need it to access your wallet.
-                    </p>
+          {/* Wallet Result */}
+          <AnimatePresence>
+            {wallet && (
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                className="glass glow-cyan"
+                style={{ marginTop: 24, padding: 32, border: "1px solid rgba(6,182,212,0.25)" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: "linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2))",
+                    border: "1px solid rgba(6,182,212,0.3)",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                  }}>💎</div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>Wallet Active</div>
+                    <div style={{ fontSize: 12, color: "var(--neon-green)" }}>✓ Successfully {mode === "create" ? "created" : "unlocked"}</div>
                   </div>
+                </div>
 
-                  {/* Commitment Section */}
-                  <div className="mb-8">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Commitment Hash
-                    </label>
-                    <div className="relative group">
-                      <div className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm text-gray-600 break-all pr-12">
-                        {wallet.commitment}
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(wallet.commitment, 'commitment')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Copy commitment"
-                      >
-                        <DocumentDuplicateIcon className="w-4 h-4 text-gray-500" />
-                        {copied === 'commitment' && (
-                          <motion.span
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="absolute -top-8 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded"
-                          >
-                            Copied!
-                          </motion.span>
-                        )}
-                      </button>
+                <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
+                  <div style={{
+                    flex: 1, padding: "16px 20px",
+                    background: "rgba(16,185,129,0.08)",
+                    border: "1px solid rgba(16,185,129,0.2)",
+                    borderRadius: 12, textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: "var(--neon-green)" }}>
+                      ₹{wallet.balance.toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>Balance (Paise Demo)</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <div className="form-label" style={{ marginBottom: 8 }}>Wallet ID</div>
+                  <div style={{
+                    padding: "12px 16px", background: "rgba(255,255,255,0.03)",
+                    borderRadius: 8, border: "1px solid var(--border-subtle)",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                  }}>
+                    <code className="mono" style={{ fontSize: 12, flexShrink: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {wallet.id}
+                    </code>
+                    <button onClick={() => copyToClipboard(wallet.id)} className="btn btn-ghost" style={{ padding: "5px 12px", fontSize: 12, flexShrink: 0 }}>
+                      {copied ? "✓ Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+
+                {wallet.commitment && (
+                  <div>
+                    <div className="form-label" style={{ marginBottom: 8 }}>Commitment Hash (Public)</div>
+                    <div style={{
+                      padding: "12px 16px", background: "rgba(255,255,255,0.03)",
+                      borderRadius: 8, border: "1px solid var(--border-subtle)",
+                    }}>
+                      <code className="mono" style={{ fontSize: 11 }}>{wallet.commitment}</code>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+                      This hash is stored on server. It proves your identity without revealing your secret.
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <Link
-                      href="/pay/merchant"
-                      className="group p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl text-center hover:shadow-lg transition-all"
-                    >
-                      <span className="block text-purple-600 font-medium mb-1">Pay Merchant</span>
-                      <span className="text-xs text-gray-500">Scan QR to pay</span>
-                    </Link>
-                    <Link
-                      href="/explorer"
-                      className="group p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl text-center hover:shadow-lg transition-all"
-                    >
-                      <span className="block text-green-600 font-medium mb-1">View History</span>
-                      <span className="text-xs text-gray-500">Check transactions</span>
-                    </Link>
-                  </div>
-
-                  {/* Success Message */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-6 p-4 bg-green-50 rounded-xl border border-green-200 flex items-center gap-3"
-                  >
-                    <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <p className="text-sm text-green-700">
-                      Wallet created successfully! Your anonymous identity is now active.
-                    </p>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-
-        {/* Security Tips */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4"
-        >
-          {[
-            { icon: "🔐", text: "Secret key never leaves your device" },
-            { icon: "🔄", text: "One-time generation for maximum security" },
-            { icon: "👁️", text: "Transactions are publicly verifiable" }
-          ].map((tip, index) => (
-            <div key={index} className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-              <span className="text-2xl">{tip.icon}</span>
-              <span className="text-sm text-gray-600">{tip.text}</span>
-            </div>
-          ))}
-        </motion.div>
-      </motion.div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

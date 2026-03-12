@@ -1,61 +1,40 @@
 /**
- * Transaction History Controller
- * ==============================
- * Handles querying transaction history, checking statuses, and retrieving
- * stored ZK proofs for verification. Preserves privacy by never returning
- * raw identities.
+ * Transaction Controller
+ * ======================
+ * Query transaction history, status, and proof hashes.
+ * Privacy is preserved — sender IDs and raw proof hashes are excluded
+ * from history responses.
  */
+
+'use strict';
 
 const prisma = require('../lib/prisma');
 const { NotFoundError, ValidationError } = require('../utils/errorHandler');
 
-/**
- * 1. Get Transaction Status
- * GET /api/transactions/status/:txId
- *
- * @param {Request} req  - Expected param: /:txId
- * @param {Response} res - Returns simple status of the payment
- */
+// ── getTransactionStatus ──────────────────────────────────────────────────────
+// GET /api/transactions/status/:txId
 const getTransactionStatus = async (req, res) => {
   const { txId } = req.params;
 
-  const transaction = await prisma.transaction.findUnique({
-    where: { id: txId },
-    select: {
-      status: true,
-      amount: true,
-      createdAt: true,
-    },
+  const tx = await prisma.transaction.findUnique({
+    where:  { id: txId },
+    select: { status: true, amount: true, createdAt: true },
   });
 
-  if (!transaction) {
-    throw new NotFoundError(`Transaction not found with ID: ${txId}`);
-  }
+  if (!tx) throw new NotFoundError(`Transaction not found with ID: ${txId}`);
 
-  res.json({
-    success: true,
-    status: transaction.status,
-    amount: transaction.amount,
-    date: transaction.createdAt,
-  });
+  res.json({ success: true, status: tx.status, amount: tx.amount, date: tx.createdAt });
 };
 
-/**
- * 2. Get User Transactions (History)
- * GET /api/transactions/history/:userId
- *
- * Supports pagination via ?limit=50&offset=0 and
- * date filtering via ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
- *
- * @param {Request} req  - Expected param: /:userId
- * @param {Response} res - Returns history without exposing sensitive identity data
- */
+// ── getUserTransactions ───────────────────────────────────────────────────────
+// GET /api/transactions/history/:userId
+// Supports ?limit=50&offset=0&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 const getUserTransactions = async (req, res) => {
   const { userId } = req.params;
-  const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-  const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+  const limit  = Math.min(parseInt(req.query.limit)  || 50, 100);
+  const offset = Math.max(parseInt(req.query.offset) || 0,  0);
 
-  // ── Date Filtering ──────────────────────────────────────────────────────────
+  // Date range filter
   const { startDate, endDate } = req.query;
   const dateFilter = {};
 
@@ -68,46 +47,24 @@ const getUserTransactions = async (req, res) => {
     if (!isNaN(end.getTime())) dateFilter.lte = end;
   }
 
-  const whereClause = {
-    fromUserId: userId,
-  };
-  
-  if (Object.keys(dateFilter).length > 0) {
-    whereClause.createdAt = dateFilter;
-  }
+  const whereClause = { fromUserId: userId };
+  if (Object.keys(dateFilter).length > 0) whereClause.createdAt = dateFilter;
 
-  // ── Database Verification & Query ───────────────────────────────────────────
-  // First, verify the user actually exists so we can throw a proper 404
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true },
-  });
+  // Verify user exists before querying transactions
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!user) throw new NotFoundError(`User wallet not found with ID: ${userId}`);
 
-  if (!user) {
-    throw new NotFoundError(`User wallet not found with ID: ${userId}`);
-  }
-
-  // Fetch paginated transaction history
   const [history, total] = await Promise.all([
     prisma.transaction.findMany({
-      where: whereClause,
+      where:   whereClause,
       orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset,
-      select: {
-        id: true,
-        amount: true,
-        status: true,
-        createdAt: true,
-        merchantId: true, // Usually public or hashed, safe to display
-      },
+      take:    limit,
+      skip:    offset,
+      // fromUserId and proofHash intentionally excluded (privacy)
+      select:  { id: true, amount: true, status: true, createdAt: true, merchantId: true },
     }),
     prisma.transaction.count({ where: whereClause }),
   ]);
-
-  // Optionally mask/hash merchantId here if extremely strict privacy is needed,
-  // but typically users want to see who they paid.
-  // Note: fromUserId and proofHash are EXCLUDED entirely from this response.
 
   res.json({
     success: true,
@@ -115,53 +72,36 @@ const getUserTransactions = async (req, res) => {
     limit,
     offset,
     transactions: history.map((tx) => ({
-      id: tx.id,
-      amount: tx.amount,
-      status: tx.status,
-      date: tx.createdAt,
+      id:         tx.id,
+      amount:     tx.amount,
+      status:     tx.status,
+      date:       tx.createdAt,
       merchantId: tx.merchantId,
     })),
   });
 };
 
-/**
- * 3. Get Transaction Proof
- * GET /api/transactions/:txId/proof
- *
- * Allows a verifier or user to retrieve the cryptographic proof commitment 
- * that authorised this transaction.
- *
- * @param {Request} req  - Expected param: /:txId
- * @param {Response} res - Returns the associated proof hash
- */
+// ── getTransactionProof ───────────────────────────────────────────────────────
+// GET /api/transactions/:txId/proof
 const getTransactionProof = async (req, res) => {
   const { txId } = req.params;
 
-  const transaction = await prisma.transaction.findUnique({
-    where: { id: txId },
-    select: {
-      proofHash: true,
-      createdAt: true,
-    },
+  const tx = await prisma.transaction.findUnique({
+    where:  { id: txId },
+    select: { proofHash: true, createdAt: true },
   });
 
-  if (!transaction) {
-    throw new NotFoundError(`Transaction not found with ID: ${txId}`);
-  }
+  if (!tx) throw new NotFoundError(`Transaction not found with ID: ${txId}`);
 
   res.json({
-    success: true,
+    success:       true,
     transactionId: txId,
-    proofHash: transaction.proofHash,
-    date: transaction.createdAt,
-    message: 'Proof hash can be used by the verifier to audit the ledger mathematically.',
+    proofHash:     tx.proofHash,
+    date:          tx.createdAt,
+    message:       'Proof hash can be used to audit this transaction mathematically.',
   });
 };
 
 // ── Exports ───────────────────────────────────────────────────────────────────
 
-module.exports = {
-  getTransactionStatus,
-  getUserTransactions,
-  getTransactionProof,
-};
+module.exports = { getTransactionStatus, getUserTransactions, getTransactionProof };

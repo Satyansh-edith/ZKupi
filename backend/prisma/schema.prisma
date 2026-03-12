@@ -74,9 +74,24 @@ model Transaction {
 
   // Relations
   fromUser   User     @relation(fields: [fromUserId], references: [id], onDelete: Restrict)
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
 
   @@index([fromUserId])
   @@index([merchantId])
   @@index([status])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Merchant — stores standard business details
+// ─────────────────────────────────────────────────────────────
+model Merchant {
+  id           String   @id @default(uuid())
+  name         String
+  createdAt    DateTime @default(now())
+
+  // Relations
+  transactions Transaction[]
+
   @@index([createdAt])
 }

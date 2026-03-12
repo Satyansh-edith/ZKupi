@@ -1,26 +1,24 @@
 /**
  * Prisma Client Singleton
  * =======================
- * Prevents multiple Prisma connections in development (hot-reload creates
- * new instances on every file save — this pattern reuses the same instance).
+ * Ensures a single PrismaClient instance to avoid connection pool exhaustion
+ * in development with hot-reloading (nodemon).
  */
 
-const { PrismaClient } = require("@prisma/client");
+'use strict';
 
-// In development, attach to global to survive hot-reloads
-const globalForPrisma = global;
+const { PrismaClient } = require('@prisma/client');
+
+const globalWithPrisma = global;
 
 const prisma =
-  globalForPrisma.prisma ||
+  globalWithPrisma.__prisma ||
   new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') {
+  globalWithPrisma.__prisma = prisma;
 }
 
 module.exports = prisma;

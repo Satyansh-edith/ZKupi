@@ -1,84 +1,101 @@
-// components/Navbar.tsx
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { motion } from "framer-motion"
-import { ShieldCheckIcon, WalletIcon, BuildingStorefrontIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const NAV_LINKS = [
+  { href: "/",         label: "Home"       },
+  { href: "/wallet",   label: "Wallet"     },
+  { href: "/merchant", label: "Merchant"   },
+  { href: "/explorer", label: "Explorer"   },
+  { href: "/pay",      label: "Pay Now"    },
+];
 
 export default function Navbar() {
-  const pathname = usePathname()
-  
-  const navItems = [
-    { href: "/", label: "Home", icon: ShieldCheckIcon },
-    { href: "/wallet", label: "Wallet", icon: WalletIcon },
-    { href: "/merchant", label: "Merchant", icon: BuildingStorefrontIcon },
-    { href: "/explorer", label: "Explorer", icon: MagnifyingGlassIcon },
-  ]
+  const pathname = usePathname();
 
   return (
-    <motion.nav 
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3">
-            <motion.div
-              whileHover={{ rotate: 180 }}
-              transition={{ duration: 0.3 }}
-              className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center"
-            >
-              <ShieldCheckIcon className="w-5 h-5 text-white" />
-            </motion.div>
-            <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text">
-              ZK-UPI
-            </span>
-          </Link>
+    <nav style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 100,
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      background: "rgba(8, 11, 20, 0.85)",
+      borderBottom: "1px solid rgba(255,255,255,0.06)",
+      height: "72px",
+      display: "flex",
+      alignItems: "center",
+    }}>
+      <div style={{
+        maxWidth: 1100,
+        margin: "0 auto",
+        padding: "0 24px",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}>
+        {/* Logo */}
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: "linear-gradient(135deg, #8b5cf6, #06b6d4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            boxShadow: "0 0 16px rgba(139,92,246,0.4)",
+          }}>🔐</div>
+          <span style={{
+            fontSize: 18,
+            fontWeight: 800,
+            background: "linear-gradient(135deg, #8b5cf6, #06b6d4)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>ZK-UPI</span>
+        </Link>
 
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href
-              const Icon = item.icon
-              
-              return (
-                <Link key={item.href} href={item.href}>
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`relative px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
-                      isActive 
-                        ? 'text-blue-600' 
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="font-medium">{item.label}</span>
-                    {isActive && (
-                      <motion.div
-                        layoutId="navbar-indicator"
-                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"
-                        initial={false}
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      />
-                    )}
-                  </motion.div>
-                </Link>
-              )
-            })}
-          </div>
-
-          {/* Mobile Menu Button (you can enhance this later) */}
-          <button className="md:hidden p-2 rounded-lg hover:bg-gray-100">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+        {/* Nav Links */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {NAV_LINKS.slice(0, -1).map((link) => {
+            const isActive = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                style={{
+                  padding: "7px 16px",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: isActive ? "#8b5cf6" : "#94a3b8",
+                  background: isActive ? "rgba(139,92,246,0.12)" : "transparent",
+                  border: isActive ? "1px solid rgba(139,92,246,0.25)" : "1px solid transparent",
+                  transition: "all 0.15s ease",
+                  textDecoration: "none",
+                }}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
+
+        {/* CTA Button */}
+        <Link
+          href="/pay"
+          className="btn btn-primary"
+          style={{ padding: "9px 20px", fontSize: 14 }}
+        >
+          ⚡ Pay Now
+        </Link>
       </div>
-    </motion.nav>
-  )
+    </nav>
+  );
 }

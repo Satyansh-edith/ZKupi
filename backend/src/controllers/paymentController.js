@@ -5,17 +5,18 @@
  *
  * Flow:
  *   1. Validate request inputs
- *   2. Look up the sender user in the database
- *   3. Cross-check the ZK commitment against the registered identity hash
- *   4. Check the nullifier to prevent double-spend
- *   5. Verify the ZK proof (mock in hackathon mode)
- *   6. Record nullifier + transaction atomically in a DB transaction
- *   7. Return the transaction ID
+ *   2. Verify sender exists and ZK commitment matches registered identity
+ *   3. Double-spend check via nullifier
+ *   4. Verify ZK proof (mock or real SnarkJS)
+ *   5. Atomically record nullifier + transaction in DB
+ *   6. Return transaction ID
  */
+
+'use strict';
 
 const axios  = require('axios');
 const prisma = require('../lib/prisma');
-const { config } = require('../utils/envValidator');
+const { config }       = require('../utils/envValidator');
 const { verifyZKProof } = require('../utils/proofVerifier');
 const { ValidationError, ProofError, NotFoundError } = require('../utils/errorHandler');
 
@@ -32,19 +33,19 @@ const submitPayment = async (req, res) => {
     throw new ValidationError('amount must be a positive number.');
   }
 
-  // Step 2 — Normalise publicSignals
+  // Step 2 — Normalise publicSignals → [amount, nullifier, commitment]
   const signals = Array.isArray(publicSignals)
     ? publicSignals
     : [String(amount), publicSignals.nullifier, publicSignals.commitment];
 
   if (signals.length < 3) {
-    throw new ValidationError('publicSignals must be [amount, nullifier, commitment].');
+    throw new ValidationError('publicSignals must contain [amount, nullifier, commitment].');
   }
 
   const nullifier  = signals[1];
   const commitment = signals[2];
 
-  // Step 3 — Verify sender exists and commitment matches their registered identity
+  // Step 3 — Verify sender exists and commitment matches registered identity
   const sender = await prisma.user.findUnique({
     where:  { id: fromUserId },
     select: { id: true, identityHash: true },
@@ -61,39 +62,43 @@ const submitPayment = async (req, res) => {
     throw new ProofError('Payment already processed (double-spend detected).');
   }
 
-  // Step 5 — Verify ZK proof (uses mock mode unless USE_REAL_ZK_PROOFS=true)
+  // Step 5 — Verify ZK proof
   const isValid = await verifyZKProof(proof, signals);
   if (!isValid) throw new ProofError('Invalid proof — mathematical verification failed.');
 
-  // Step 6 — Atomically record the nullifier and create the transaction
+  // Step 6 — Atomically record nullifier and transaction
   let transactionId;
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      // Lock nullifier first to prevent race conditions
-      await tx.nullifier.create({ data: { nullifier, userId: fromUserId } });
+  await prisma.$transaction(async (tx) => {
+    // Lock nullifier first to prevent race conditions
+    await tx.nullifier.create({ data: { nullifier, userId: fromUserId } });
 
-      // Optionally ping the external payment engine (graceful fallback if offline)
-      const engineUrl = config.paymentEngineUrl || 'http://localhost:3003/process-payment';
-      try {
-        const response = await axios.post(engineUrl, { fromUserId, toAddress, amount }, { timeout: 3000 });
-        if (!response.data.success) throw new Error(response.data.error);
-      } catch {
-        // External engine unavailable — continue with DB record only (hackathon fallback)
-        console.warn('[Payment] External engine unreachable — mock success applied.');
-      }
+    // Optionally ping external payment engine (graceful fallback if offline)
+    const engineUrl = config.paymentEngineUrl || 'http://localhost:3003/process-payment';
+    try {
+      const response = await axios.post(engineUrl, { fromUserId, toAddress, amount }, { timeout: 3000 });
+      if (!response.data.success) throw new Error(response.data.error);
+    } catch {
+      console.warn('[Payment] External engine unreachable — mock success applied.');
+    }
 
-      // Record transaction
-      const dbTx = await tx.transaction.create({
-        data: { fromUserId, amount, proofHash: commitment, merchantId: toAddress, status: 'completed' },
-      });
-      transactionId = dbTx.id;
+    const dbTx = await tx.transaction.create({
+      data: {
+        fromUserId,
+        amount,
+        proofHash:  commitment,
+        merchantId: toAddress,
+        status:     'completed',
+      },
     });
-  } catch (err) {
-    throw new Error(err.message);
-  }
+    transactionId = dbTx.id;
+  });
 
-  res.status(200).json({ success: true, transactionId, message: 'Payment processed successfully.' });
+  res.status(200).json({
+    success:       true,
+    transactionId,
+    message:       'Payment processed successfully.',
+  });
 };
 
 // ── getPaymentStatus ──────────────────────────────────────────────────────────
@@ -125,5 +130,7 @@ const getUserHistory = async (req, res) => {
 
   res.json({ success: true, count: history.length, transactions: history });
 };
+
+// ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = { submitPayment, getPaymentStatus, getUserHistory };

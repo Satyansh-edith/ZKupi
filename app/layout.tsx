@@ -1,27 +1,23 @@
-import "./globals.css"
-import Navbar from "../components/Navbar"
-import { Inter } from 'next/font/google'
+import type { Metadata } from "next";
+import "./globals.css";
+import Navbar from "@/components/Navbar";
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata = {
-  title: 'ZK-UPI - Privacy Payments',
-  description: 'Privacy-preserving digital payment system using Zero-Knowledge Proofs',
-}
+export const metadata: Metadata = {
+  title: "ZK-UPI | Privacy-First Payments",
+  description: "Zero Knowledge UPI Payment System — pay privately with cryptographic proof, no identity revealed.",
+};
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} antialiased min-h-full bg-gradient-to-br from-gray-50 via-white to-gray-50`}>
+    <html lang="en">
+      <body>
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main style={{ paddingTop: "72px" }}>
           {children}
         </main>
       </body>
     </html>
-  )
+  );
 }
